@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,6 +17,7 @@ type Job = Tables<'jobs'>;
 type JobApplication = Tables<'job_applications'> & {
   profiles: Tables<'profiles'>;
 };
+type ApplicationStatus = Tables<'job_applications'>['status'];
 
 export default function EmployerDashboard() {
   const { user, profile } = useAuth();
@@ -134,7 +134,7 @@ export default function EmployerDashboard() {
     }
   };
 
-  const updateApplicationStatus = async (applicationId: string, status: string) => {
+  const updateApplicationStatus = async (applicationId: string, status: ApplicationStatus) => {
     try {
       const { error } = await supabase
         .from('job_applications')
@@ -365,7 +365,7 @@ export default function EmployerDashboard() {
                       <div className="flex gap-2">
                         <Button
                           size="sm"
-                          onClick={() => updateApplicationStatus(application.id, 'accepted')}
+                          onClick={() => updateApplicationStatus(application.id, 'accepted' as ApplicationStatus)}
                           className="bg-green-600 hover:bg-green-700"
                         >
                           Accept
@@ -373,14 +373,14 @@ export default function EmployerDashboard() {
                         <Button
                           size="sm"
                           variant="destructive"
-                          onClick={() => updateApplicationStatus(application.id, 'rejected')}
+                          onClick={() => updateApplicationStatus(application.id, 'rejected' as ApplicationStatus)}
                         >
                           Reject
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => updateApplicationStatus(application.id, 'reviewed')}
+                          onClick={() => updateApplicationStatus(application.id, 'reviewed' as ApplicationStatus)}
                         >
                           Mark Reviewed
                         </Button>
