@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { Navigation } from "@/components/Navigation";
+import { BottomAppMenu } from "@/components/BottomAppMenu";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Jobs from "./pages/Jobs";
@@ -58,31 +59,34 @@ function AppRoutes() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
-      <Routes>
-        <Route path="/" element={user ? <Navigate to="/jobs" replace /> : <Index />} />
-        <Route path="/auth" element={user ? <Navigate to="/jobs" replace /> : <Auth />} />
-        <Route path="/jobs" element={
-          <ProtectedRoute>
-            <Jobs />
-          </ProtectedRoute>
-        } />
-        <Route path="/employer/dashboard" element={
-          <ProtectedRoute requiredRole="employer">
-            <EmployerDashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/dashboard" element={
-          <ProtectedRoute requiredRole="job_seeker">
-            <Dashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/profile" element={
-          <ProtectedRoute>
-            <Profile />
-          </ProtectedRoute>
-        } />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <div className="pb-16 md:pb-0">
+        <Routes>
+          <Route path="/" element={user ? <Navigate to="/jobs" replace /> : <Index />} />
+          <Route path="/auth" element={user ? <Navigate to="/jobs" replace /> : <Auth />} />
+          <Route path="/jobs" element={
+            <ProtectedRoute>
+              <Jobs />
+            </ProtectedRoute>
+          } />
+          <Route path="/employer/dashboard" element={
+            <ProtectedRoute requiredRole="employer">
+              <EmployerDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/dashboard" element={
+            <ProtectedRoute requiredRole="job_seeker">
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          } />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </div>
+      <BottomAppMenu />
     </div>
   );
 }
