@@ -9,14 +9,20 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, Briefcase, User } from 'lucide-react';
+import { User, Briefcase, Mail, Lock } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Auth() {
-  const { user, profile, signInWithGoogle, updateProfile } = useAuth();
+  const { user, profile, updateProfile } = useAuth();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [userRole, setUserRole] = useState<'job_seeker' | 'employer'>('job_seeker');
   const [companyName, setCompanyName] = useState('');
   const [bio, setBio] = useState('');
   const [isSettingUpProfile, setIsSettingUpProfile] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -34,20 +40,50 @@ export default function Auth() {
     }
   }, [user, profile, navigate]);
 
-  const handleGoogleSignIn = async () => {
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
     try {
-      await signInWithGoogle();
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+            }
+          }
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: "Account created!",
+          description: "Please check your email to verify your account.",
+        });
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: "Signed in successfully!",
+          description: "Welcome back!",
+        });
+      }
+    } catch (error: any) {
+      console.error('Auth error:', error);
       toast({
-        title: "Signing in...",
-        description: "Please wait while we redirect you.",
-      });
-    } catch (error) {
-      console.error('Sign in error:', error);
-      toast({
-        title: "Sign in failed",
-        description: "Please try again.",
+        title: isSignUp ? "Sign up failed" : "Sign in failed",
+        description: error.message || "Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -151,18 +187,80 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-center text-2xl">Welcome to HireTrack</CardTitle>
+          <CardTitle className="text-center text-2xl">
+            {isSignUp ? 'Create Account' : 'Welcome Back'}
+          </CardTitle>
           <CardDescription className="text-center">
-            Connect job seekers with employers
+            {isSignUp ? 'Join HireTrack to connect with opportunities' : 'Sign in to your HireTrack account'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button onClick={handleGoogleSignIn} className="w-full" size="lg">
-            <Mail className="w-4 h-4 mr-2" />
-            Sign in with Google
-          </Button>
+          <form onSubmit={handleEmailAuth} className="space-y-4">
+            {isSignUp && (
+              <div>
+                <Label htmlFor="fullName">Full Name</Label>
+                <Input
+                  id="fullName"
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Enter your full name"
+                  required
+                />
+              </div>
+            )}
+            
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+                minLength={6}
+              />
+            </div>
+
+            <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+              {isLoading ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  {isSignUp ? 'Creating Account...' : 'Signing In...'}
+                </div>
+              ) : (
+                <>
+                  {isSignUp ? <User className="w-4 h-4 mr-2" /> : <Lock className="w-4 h-4 mr-2" />}
+                  {isSignUp ? 'Create Account' : 'Sign In'}
+                </>
+              )}
+            </Button>
+          </form>
+
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+            </button>
+          </div>
+
           <p className="text-xs text-gray-500 text-center mt-4">
-            By signing in, you agree to our terms of service and privacy policy.
+            By {isSignUp ? 'creating an account' : 'signing in'}, you agree to our terms of service and privacy policy.
           </p>
         </CardContent>
       </Card>
