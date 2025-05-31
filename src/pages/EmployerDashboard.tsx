@@ -11,7 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Tables } from '@/integrations/supabase/types';
-import { Plus, Eye, Edit, Trash2, Users, Briefcase } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, Users, Briefcase, BarChart3, LogOut } from 'lucide-react';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 
 type Job = Tables<'jobs'>;
 type JobApplication = Tables<'job_applications'> & {
@@ -20,11 +22,13 @@ type JobApplication = Tables<'job_applications'> & {
 type ApplicationStatus = Tables<'job_applications'>['status'];
 
 export default function EmployerDashboard() {
-  const { user, profile } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<JobApplication[]>([]);
+  const [analyticsData, setAnalyticsData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [newJob, setNewJob] = useState({
     title: '',
@@ -43,6 +47,12 @@ export default function EmployerDashboard() {
       fetchApplications();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (jobs.length > 0) {
+      fetchAnalyticsData();
+    }
+  }, [jobs]);
 
   const fetchJobs = async () => {
     if (!user) return;
@@ -84,6 +94,38 @@ export default function EmployerDashboard() {
       setApplications(data || []);
     } catch (error) {
       console.error('Error fetching applications:', error);
+    }
+  };
+
+  const fetchAnalyticsData = async () => {
+    if (!user || jobs.length === 0) return;
+
+    try {
+      const jobIds = jobs.map(job => job.id);
+      const { data, error } = await supabase
+        .from('job_applications')
+        .select('applied_at')
+        .in('job_id', jobIds)
+        .order('applied_at', { ascending: true });
+
+      if (error) throw error;
+
+      // Group applications by date
+      const groupedData = (data || []).reduce((acc: any, app) => {
+        const date = new Date(app.applied_at).toLocaleDateString();
+        acc[date] = (acc[date] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Convert to chart format
+      const chartData = Object.entries(groupedData).map(([date, count]) => ({
+        date,
+        applications: count
+      }));
+
+      setAnalyticsData(chartData);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
     }
   };
 
@@ -134,28 +176,93 @@ export default function EmployerDashboard() {
     }
   };
 
-  const updateApplicationStatus = async (applicationId: string, status: ApplicationStatus) => {
+  const updateJob = async () => {
+    if (!selectedJob) return;
+
     try {
       const { error } = await supabase
-        .from('job_applications')
-        .update({ 
-          status,
-          reviewed_at: new Date().toISOString()
+        .from('jobs')
+        .update({
+          title: newJob.title,
+          description: newJob.description,
+          location: newJob.location || null,
+          salary_min: newJob.salary_min ? parseInt(newJob.salary_min) : null,
+          salary_max: newJob.salary_max ? parseInt(newJob.salary_max) : null,
+          job_type: newJob.job_type || null,
+          requirements: newJob.requirements || null,
         })
-        .eq('id', applicationId);
+        .eq('id', selectedJob.id);
 
       if (error) throw error;
 
-      fetchApplications();
+      setIsEditDialogOpen(false);
+      setSelectedJob(null);
+      fetchJobs();
+      
       toast({
-        title: "Application updated",
-        description: `Application status changed to ${status}.`,
+        title: "Job updated!",
+        description: "Your job posting has been updated.",
       });
     } catch (error) {
-      console.error('Error updating application:', error);
+      console.error('Error updating job:', error);
       toast({
-        title: "Update failed",
+        title: "Failed to update job",
         description: "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteJob = async (jobId: string) => {
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .delete()
+        .eq('id', jobId);
+
+      if (error) throw error;
+
+      fetchJobs();
+      toast({
+        title: "Job deleted",
+        description: "The job posting has been removed.",
+      });
+    } catch (error) {
+      console.error('Error deleting job:', error);
+      toast({
+        title: "Failed to delete job",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const openEditDialog = (job: Job) => {
+    setSelectedJob(job);
+    setNewJob({
+      title: job.title,
+      description: job.description,
+      location: job.location || '',
+      salary_min: job.salary_min?.toString() || '',
+      salary_max: job.salary_max?.toString() || '',
+      job_type: job.job_type || '',
+      requirements: job.requirements || ''
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Signed out",
+        description: "You have been successfully signed out.",
+      });
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast({
+        title: "Error",
+        description: "Failed to sign out.",
         variant: "destructive",
       });
     }
@@ -169,6 +276,13 @@ export default function EmployerDashboard() {
       case 'rejected': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const chartConfig = {
+    applications: {
+      label: "Applications",
+      color: "#3b82f6",
+    },
   };
 
   if (loading) {
@@ -191,107 +305,144 @@ export default function EmployerDashboard() {
               <h1 className="text-3xl font-bold text-gray-900">Employer Dashboard</h1>
               <p className="mt-2 text-gray-600">Manage your job postings and applications</p>
             </div>
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Post New Job
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px] bg-white">
-                <DialogHeader>
-                  <DialogTitle>Post a New Job</DialogTitle>
-                  <DialogDescription>
-                    Fill in the details for your job posting.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="title" className="text-right">Title</Label>
-                    <Input
-                      id="title"
-                      value={newJob.title}
-                      onChange={(e) => setNewJob({...newJob, title: e.target.value})}
-                      className="col-span-3"
-                      placeholder="Software Engineer"
-                    />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="location" className="text-right">Location</Label>
-                    <Input
-                      id="location"
-                      value={newJob.location}
-                      onChange={(e) => setNewJob({...newJob, location: e.target.value})}
-                      className="col-span-3"
-                      placeholder="San Francisco, CA"
-                    />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="job_type" className="text-right">Type</Label>
-                    <Select value={newJob.job_type} onValueChange={(value) => setNewJob({...newJob, job_type: value})}>
-                      <SelectTrigger className="col-span-3">
-                        <SelectValue placeholder="Select job type" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white">
-                        <SelectItem value="full-time">Full-time</SelectItem>
-                        <SelectItem value="part-time">Part-time</SelectItem>
-                        <SelectItem value="contract">Contract</SelectItem>
-                        <SelectItem value="remote">Remote</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label className="text-right">Salary Range</Label>
-                    <div className="col-span-3 flex gap-2">
+            <div className="flex items-center space-x-4">
+              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Post New Job
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[600px] bg-white">
+                  <DialogHeader>
+                    <DialogTitle>Post a New Job</DialogTitle>
+                    <DialogDescription>
+                      Fill in the details for your job posting.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="title" className="text-right">Title</Label>
                       <Input
-                        value={newJob.salary_min}
-                        onChange={(e) => setNewJob({...newJob, salary_min: e.target.value})}
-                        placeholder="Min"
-                        type="number"
+                        id="title"
+                        value={newJob.title}
+                        onChange={(e) => setNewJob({...newJob, title: e.target.value})}
+                        className="col-span-3"
+                        placeholder="Software Engineer"
                       />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="location" className="text-right">Location</Label>
                       <Input
-                        value={newJob.salary_max}
-                        onChange={(e) => setNewJob({...newJob, salary_max: e.target.value})}
-                        placeholder="Max"
-                        type="number"
+                        id="location"
+                        value={newJob.location}
+                        onChange={(e) => setNewJob({...newJob, location: e.target.value})}
+                        className="col-span-3"
+                        placeholder="San Francisco, CA"
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="job_type" className="text-right">Type</Label>
+                      <Select value={newJob.job_type} onValueChange={(value) => setNewJob({...newJob, job_type: value})}>
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue placeholder="Select job type" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white">
+                          <SelectItem value="full-time">Full-time</SelectItem>
+                          <SelectItem value="part-time">Part-time</SelectItem>
+                          <SelectItem value="contract">Contract</SelectItem>
+                          <SelectItem value="remote">Remote</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label className="text-right">Salary Range</Label>
+                      <div className="col-span-3 flex gap-2">
+                        <Input
+                          value={newJob.salary_min}
+                          onChange={(e) => setNewJob({...newJob, salary_min: e.target.value})}
+                          placeholder="Min"
+                          type="number"
+                        />
+                        <Input
+                          value={newJob.salary_max}
+                          onChange={(e) => setNewJob({...newJob, salary_max: e.target.value})}
+                          placeholder="Max"
+                          type="number"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-4 items-start gap-4">
+                      <Label htmlFor="description" className="text-right">Description</Label>
+                      <Textarea
+                        id="description"
+                        value={newJob.description}
+                        onChange={(e) => setNewJob({...newJob, description: e.target.value})}
+                        className="col-span-3"
+                        rows={4}
+                        placeholder="Job description..."
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-start gap-4">
+                      <Label htmlFor="requirements" className="text-right">Requirements</Label>
+                      <Textarea
+                        id="requirements"
+                        value={newJob.requirements}
+                        onChange={(e) => setNewJob({...newJob, requirements: e.target.value})}
+                        className="col-span-3"
+                        rows={3}
+                        placeholder="Job requirements..."
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-4 items-start gap-4">
-                    <Label htmlFor="description" className="text-right">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={newJob.description}
-                      onChange={(e) => setNewJob({...newJob, description: e.target.value})}
-                      className="col-span-3"
-                      rows={4}
-                      placeholder="Job description..."
-                    />
+                  <div className="flex justify-end">
+                    <Button onClick={createJob} disabled={!newJob.title || !newJob.description}>
+                      Post Job
+                    </Button>
                   </div>
-                  <div className="grid grid-cols-4 items-start gap-4">
-                    <Label htmlFor="requirements" className="text-right">Requirements</Label>
-                    <Textarea
-                      id="requirements"
-                      value={newJob.requirements}
-                      onChange={(e) => setNewJob({...newJob, requirements: e.target.value})}
-                      className="col-span-3"
-                      rows={3}
-                      placeholder="Job requirements..."
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end">
-                  <Button onClick={createJob} disabled={!newJob.title || !newJob.description}>
-                    Post Job
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+                </DialogContent>
+              </Dialog>
+              <Button variant="outline" onClick={handleSignOut}>
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
           </div>
         </div>
 
+        {/* Analytics Section */}
+        {analyticsData.length > 0 && (
+          <div className="mb-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <BarChart3 className="w-5 h-5 mr-2" />
+                  Job Applications Analytics
+                </CardTitle>
+                <CardDescription>Daily application submissions to your job posts</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer config={chartConfig} className="h-[300px]">
+                  <LineChart data={analyticsData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Line 
+                      type="monotone" 
+                      dataKey="applications" 
+                      stroke="var(--color-applications)" 
+                      strokeWidth={2}
+                    />
+                  </LineChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         <div className="grid gap-8 lg:grid-cols-2">
-          {/* Jobs Section */}
+          {/* Jobs Section with Edit/Delete */}
           <div>
             <h2 className="text-xl font-semibold mb-4 flex items-center">
               <Briefcase className="w-5 h-5 mr-2" />
@@ -306,11 +457,27 @@ export default function EmployerDashboard() {
                         <CardTitle className="text-lg">{job.title}</CardTitle>
                         <CardDescription>{job.location}</CardDescription>
                       </div>
-                      <Badge
-                        variant={job.status === 'active' ? 'default' : 'secondary'}
-                      >
-                        {job.status}
-                      </Badge>
+                      <div className="flex items-center space-x-2">
+                        <Badge
+                          variant={job.status === 'active' ? 'default' : 'secondary'}
+                        >
+                          {job.status}
+                        </Badge>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openEditDialog(job)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => deleteJob(job.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -399,6 +566,101 @@ export default function EmployerDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Edit Job Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="sm:max-w-[600px] bg-white">
+            <DialogHeader>
+              <DialogTitle>Edit Job</DialogTitle>
+              <DialogDescription>
+                Update the details for your job posting.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="title" className="text-right">Title</Label>
+                <Input
+                  id="title"
+                  value={newJob.title}
+                  onChange={(e) => setNewJob({...newJob, title: e.target.value})}
+                  className="col-span-3"
+                  placeholder="Software Engineer"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="location" className="text-right">Location</Label>
+                <Input
+                  id="location"
+                  value={newJob.location}
+                  onChange={(e) => setNewJob({...newJob, location: e.target.value})}
+                  className="col-span-3"
+                  placeholder="San Francisco, CA"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="job_type" className="text-right">Type</Label>
+                <Select value={newJob.job_type} onValueChange={(value) => setNewJob({...newJob, job_type: value})}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select job type" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    <SelectItem value="full-time">Full-time</SelectItem>
+                    <SelectItem value="part-time">Part-time</SelectItem>
+                    <SelectItem value="contract">Contract</SelectItem>
+                    <SelectItem value="remote">Remote</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">Salary Range</Label>
+                <div className="col-span-3 flex gap-2">
+                  <Input
+                    value={newJob.salary_min}
+                    onChange={(e) => setNewJob({...newJob, salary_min: e.target.value})}
+                    placeholder="Min"
+                    type="number"
+                  />
+                  <Input
+                    value={newJob.salary_max}
+                    onChange={(e) => setNewJob({...newJob, salary_max: e.target.value})}
+                    placeholder="Max"
+                    type="number"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="description" className="text-right">Description</Label>
+                <Textarea
+                  id="description"
+                  value={newJob.description}
+                  onChange={(e) => setNewJob({...newJob, description: e.target.value})}
+                  className="col-span-3"
+                  rows={4}
+                  placeholder="Job description..."
+                />
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="requirements" className="text-right">Requirements</Label>
+                <Textarea
+                  id="requirements"
+                  value={newJob.requirements}
+                  onChange={(e) => setNewJob({...newJob, requirements: e.target.value})}
+                  className="col-span-3"
+                  rows={3}
+                  placeholder="Job requirements..."
+                />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={updateJob} disabled={!newJob.title || !newJob.description}>
+                Update Job
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
