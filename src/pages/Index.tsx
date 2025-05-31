@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Search, MapPin, DollarSign, Clock, Building } from 'lucide-react';
 import { Tables } from '@/integrations/supabase/types';
+import { BottomAppMenu } from '@/components/BottomAppMenu';
 
 type Job = Tables<'jobs'>;
 
@@ -69,7 +70,7 @@ const Index = () => {
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <Link to="/" className="text-xl font-bold text-blue-600">
-                HireTrack
+                ISPANI
               </Link>
             </div>
             <div className="flex items-center space-x-4">
@@ -182,6 +183,9 @@ const Index = () => {
           )}
         </div>
       </section>
+
+      {/* Bottom App Menu for non-logged users */}
+      <BottomAppMenu />
     </div>
   );
 };

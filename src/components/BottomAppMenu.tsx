@@ -9,15 +9,28 @@ import {
   FileText, 
   Settings,
   BarChart3,
-  Mail
+  Mail,
+  LogIn
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function BottomAppMenu() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const location = useLocation();
 
-  if (!profile) return null;
+  // Guest menu items for non-logged users
+  const guestMenuItems = [
+    {
+      icon: Briefcase,
+      label: 'Jobs',
+      href: '/',
+    },
+    {
+      icon: LogIn,
+      label: 'Sign In',
+      href: '/auth',
+    }
+  ];
 
   const jobSeekerMenuItems = [
     {
@@ -60,7 +73,11 @@ export function BottomAppMenu() {
     }
   ];
 
-  const menuItems = profile.role === 'employer' ? employerMenuItems : jobSeekerMenuItems;
+  // Determine which menu items to show
+  let menuItems = guestMenuItems;
+  if (user && profile) {
+    menuItems = profile.role === 'employer' ? employerMenuItems : jobSeekerMenuItems;
+  }
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 md:hidden">
