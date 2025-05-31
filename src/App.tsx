@@ -17,8 +17,8 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string }) {
-  const { user, profile, loading } = useAuth();
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -33,10 +33,6 @@ function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode;
 
   if (!user) {
     return <Navigate to="/auth" replace />;
-  }
-
-  if (requiredRole && profile?.role !== requiredRole) {
-    return <Navigate to="/jobs" replace />;
   }
 
   return <>{children}</>;
@@ -69,12 +65,12 @@ function AppRoutes() {
             </ProtectedRoute>
           } />
           <Route path="/employer/dashboard" element={
-            <ProtectedRoute requiredRole="employer">
+            <ProtectedRoute>
               <EmployerDashboard />
             </ProtectedRoute>
           } />
           <Route path="/dashboard" element={
-            <ProtectedRoute requiredRole="job_seeker">
+            <ProtectedRoute>
               <Dashboard />
             </ProtectedRoute>
           } />

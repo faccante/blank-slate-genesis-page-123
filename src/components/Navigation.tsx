@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { User, LogOut, Settings, Briefcase, Users } from 'lucide-react';
+import { User, LogOut, Settings, Briefcase, PlusCircle } from 'lucide-react';
 
 export function Navigation() {
   const { user, profile, signOut } = useAuth();
@@ -49,33 +49,29 @@ export function Navigation() {
                   Jobs
                 </Link>
                 
-                {profile?.role === 'employer' && (
-                  <Link
-                    to="/employer/dashboard"
-                    className={`inline-flex items-center px-1 pt-1 text-sm font-medium ${
-                      isActive('/employer/dashboard')
-                        ? 'text-blue-600 border-b-2 border-blue-600'
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <Users className="w-4 h-4 mr-2" />
-                    Employer Dashboard
-                  </Link>
-                )}
+                <Link
+                  to="/employer/dashboard"
+                  className={`inline-flex items-center px-1 pt-1 text-sm font-medium ${
+                    isActive('/employer/dashboard')
+                      ? 'text-blue-600 border-b-2 border-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <PlusCircle className="w-4 h-4 mr-2" />
+                  Post Jobs
+                </Link>
                 
-                {profile?.role === 'job_seeker' && (
-                  <Link
-                    to="/dashboard"
-                    className={`inline-flex items-center px-1 pt-1 text-sm font-medium ${
-                      isActive('/dashboard')
-                        ? 'text-blue-600 border-b-2 border-blue-600'
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <User className="w-4 h-4 mr-2" />
-                    My Applications
-                  </Link>
-                )}
+                <Link
+                  to="/dashboard"
+                  className={`inline-flex items-center px-1 pt-1 text-sm font-medium ${
+                    isActive('/dashboard')
+                      ? 'text-blue-600 border-b-2 border-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <User className="w-4 h-4 mr-2" />
+                  My Applications
+                </Link>
               </div>
             )}
           </div>
@@ -97,7 +93,6 @@ export function Navigation() {
                   <DropdownMenuItem className="flex flex-col items-start">
                     <div className="font-medium">{profile?.full_name || 'User'}</div>
                     <div className="text-sm text-gray-500">{user.email}</div>
-                    <div className="text-xs text-blue-600 capitalize">{profile?.role}</div>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link to="/profile" className="flex items-center">

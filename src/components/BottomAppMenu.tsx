@@ -3,19 +3,15 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { 
   Briefcase, 
-  Users, 
   User, 
   PlusCircle, 
   FileText, 
-  Settings,
-  BarChart3,
-  Mail,
   LogIn
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function BottomAppMenu() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const location = useLocation();
 
   // Guest menu items for non-logged users
@@ -32,11 +28,16 @@ export function BottomAppMenu() {
     }
   ];
 
-  const jobSeekerMenuItems = [
+  const userMenuItems = [
     {
       icon: Briefcase,
       label: 'Jobs',
       href: '/jobs',
+    },
+    {
+      icon: PlusCircle,
+      label: 'Post Jobs',
+      href: '/employer/dashboard',
     },
     {
       icon: FileText,
@@ -50,34 +51,8 @@ export function BottomAppMenu() {
     }
   ];
 
-  const employerMenuItems = [
-    {
-      icon: BarChart3,
-      label: 'Dashboard',
-      href: '/employer/dashboard',
-    },
-    {
-      icon: PlusCircle,
-      label: 'Post Job',
-      href: '/employer/dashboard?tab=post-job',
-    },
-    {
-      icon: Mail,
-      label: 'Applications',
-      href: '/employer/dashboard?tab=applications',
-    },
-    {
-      icon: Settings,
-      label: 'Profile',
-      href: '/profile',
-    }
-  ];
-
   // Determine which menu items to show
-  let menuItems = guestMenuItems;
-  if (user && profile) {
-    menuItems = profile.role === 'employer' ? employerMenuItems : jobSeekerMenuItems;
-  }
+  const menuItems = user ? userMenuItems : guestMenuItems;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 md:hidden">
