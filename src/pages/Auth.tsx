@@ -11,26 +11,21 @@ import { User, Mail, Lock, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Auth() {
-  const { user, profile, updateProfile } = useAuth();
+  const { user } = useAuth();
   const [isSignUp, setIsSignUp] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [isSettingUpProfile, setIsSettingUpProfile] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user && profile?.full_name) {
-      // User is authenticated and has completed profile setup
+    if (user) {
       navigate('/jobs');
-    } else if (user && !profile?.full_name) {
-      // User is authenticated but needs to complete profile setup
-      setIsSettingUpProfile(true);
     }
-  }, [user, profile, navigate]);
+  }, [user, navigate]);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,48 +101,6 @@ export default function Auth() {
       setIsLoading(false);
     }
   };
-
-  const handleCompleteProfile = async () => {
-    try {
-      await updateProfile({
-        full_name: user?.user_metadata?.full_name || 'User',
-      });
-
-      toast({
-        title: "Profile completed!",
-        description: "Welcome to ISPANI!",
-      });
-
-      navigate('/jobs');
-    } catch (error) {
-      console.error('Profile update error:', error);
-      toast({
-        title: "Profile setup failed",
-        description: "Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  if (isSettingUpProfile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center">Complete Your Profile</CardTitle>
-            <CardDescription className="text-center">
-              Just one more step to get started
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={handleCompleteProfile} className="w-full">
-              Complete Profile
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   if (isForgotPassword) {
     return (
