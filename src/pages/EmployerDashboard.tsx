@@ -237,6 +237,33 @@ export default function EmployerDashboard() {
     }
   };
 
+  const updateApplicationStatus = async (applicationId: string, status: ApplicationStatus) => {
+    try {
+      const { error } = await supabase
+        .from('job_applications')
+        .update({ 
+          status,
+          reviewed_at: status !== 'pending' ? new Date().toISOString() : null
+        })
+        .eq('id', applicationId);
+
+      if (error) throw error;
+
+      fetchApplications();
+      toast({
+        title: "Application status updated",
+        description: `Application has been marked as ${status}.`,
+      });
+    } catch (error) {
+      console.error('Error updating application status:', error);
+      toast({
+        title: "Failed to update application",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const openEditDialog = (job: Job) => {
     setSelectedJob(job);
     setNewJob({
