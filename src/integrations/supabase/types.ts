@@ -9,11 +9,45 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      cvs: {
+        Row: {
+          content_type: string | null
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_url: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content_type?: string | null
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content_type?: string | null
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       job_applications: {
         Row: {
           applicant_id: string
           applied_at: string
           cover_letter: string | null
+          cv_id: string | null
           id: string
           job_id: string
           resume_url: string | null
@@ -24,6 +58,7 @@ export type Database = {
           applicant_id: string
           applied_at?: string
           cover_letter?: string | null
+          cv_id?: string | null
           id?: string
           job_id: string
           resume_url?: string | null
@@ -34,6 +69,7 @@ export type Database = {
           applicant_id?: string
           applied_at?: string
           cover_letter?: string | null
+          cv_id?: string | null
           id?: string
           job_id?: string
           resume_url?: string | null
@@ -46,6 +82,13 @@ export type Database = {
             columns: ["applicant_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_applications_cv_id_fkey"
+            columns: ["cv_id"]
+            isOneToOne: false
+            referencedRelation: "cvs"
             referencedColumns: ["id"]
           },
           {

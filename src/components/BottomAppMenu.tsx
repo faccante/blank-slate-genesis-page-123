@@ -11,7 +11,7 @@ import {
 import { cn } from '@/lib/utils';
 
 export function BottomAppMenu() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const location = useLocation();
 
   // Guest menu items for non-logged users
@@ -28,31 +28,45 @@ export function BottomAppMenu() {
     }
   ];
 
-  const userMenuItems = [
-    {
-      icon: Briefcase,
-      label: 'Jobs',
-      href: '/jobs',
-    },
-    {
-      icon: PlusCircle,
-      label: 'Post Jobs',
-      href: '/employer/dashboard',
-    },
-    {
-      icon: FileText,
-      label: 'Applications',
-      href: '/dashboard',
-    },
-    {
+  const getMenuItems = () => {
+    const baseItems = [
+      {
+        icon: Briefcase,
+        label: 'Jobs',
+        href: '/jobs',
+      }
+    ];
+
+    // Add Post Jobs only for employers
+    if (profile?.role === 'employer') {
+      baseItems.push({
+        icon: PlusCircle,
+        label: 'Post Jobs',
+        href: '/employer/dashboard',
+      });
+    }
+
+    // Add Applications for job seekers
+    if (profile?.role === 'job_seeker') {
+      baseItems.push({
+        icon: FileText,
+        label: 'Applications',
+        href: '/dashboard',
+      });
+    }
+
+    // Add Profile for all authenticated users
+    baseItems.push({
       icon: User,
       label: 'Profile',
       href: '/profile',
-    }
-  ];
+    });
+
+    return baseItems;
+  };
 
   // Determine which menu items to show
-  const menuItems = user ? userMenuItems : guestMenuItems;
+  const menuItems = user ? getMenuItems() : guestMenuItems;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 md:hidden">

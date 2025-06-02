@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { User, Building, Mail, Phone, MapPin, FileText } from 'lucide-react';
+import { CVManager } from '@/components/CVManager';
 
 export default function Profile() {
   const { user, profile, updateProfile } = useAuth();
@@ -125,6 +126,13 @@ export default function Profile() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* CV Management for Job Seekers */}
+            {profile.role === 'job_seeker' && (
+              <div className="mt-6">
+                <CVManager />
+              </div>
+            )}
           </div>
 
           {/* Profile Form */}
