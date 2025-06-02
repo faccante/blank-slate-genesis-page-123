@@ -39,16 +39,21 @@ export default function Auth() {
           options: {
             data: {
               full_name: fullName,
-            }
+            },
+            emailRedirectTo: `${window.location.origin}/jobs`
           }
         });
 
         if (error) throw error;
 
         toast({
-          title: "Account created!",
-          description: "Please check your email to verify your account.",
+          title: "Account created successfully!",
+          description: "Please check your email to verify your account before signing in.",
         });
+        
+        // Switch to sign in mode after successful signup
+        setIsSignUp(false);
+        setPassword(''); // Clear password for security
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
