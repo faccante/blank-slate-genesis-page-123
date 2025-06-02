@@ -59,8 +59,7 @@ export function BottomAppMenu() {
       <div className="flex justify-around items-center max-w-md mx-auto">
         {menuItems.map((item) => {
           const Icon = item.icon;
-          const isActive = location.pathname === item.href || 
-            (item.href.includes('?') && location.pathname === item.href.split('?')[0]);
+          const isActive = location.pathname === item.href;
           
           return (
             <Link

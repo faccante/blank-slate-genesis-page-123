@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Tables } from '@/integrations/supabase/types';
-import { Plus, Eye, Edit, Trash2, Users, Briefcase, BarChart3, LogOut } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Briefcase, BarChart3 } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 
@@ -22,7 +23,7 @@ type JobApplication = Tables<'job_applications'> & {
 type ApplicationStatus = Tables<'job_applications'>['status'];
 
 export default function EmployerDashboard() {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [analyticsData, setAnalyticsData] = useState<any[]>([]);
@@ -44,12 +45,12 @@ export default function EmployerDashboard() {
   useEffect(() => {
     if (user) {
       fetchJobs();
-      fetchApplications();
     }
   }, [user]);
 
   useEffect(() => {
     if (jobs.length > 0) {
+      fetchApplications();
       fetchAnalyticsData();
     }
   }, [jobs]);
@@ -58,6 +59,7 @@ export default function EmployerDashboard() {
     if (!user) return;
 
     try {
+      console.log('Fetching jobs for user:', user.id);
       const { data, error } = await supabase
         .from('jobs')
         .select('*')
@@ -65,6 +67,7 @@ export default function EmployerDashboard() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      console.log('Fetched jobs:', data);
       setJobs(data || []);
     } catch (error) {
       console.error('Error fetching jobs:', error);
@@ -79,18 +82,22 @@ export default function EmployerDashboard() {
   };
 
   const fetchApplications = async () => {
-    if (!user) return;
+    if (!user || jobs.length === 0) return;
 
     try {
+      const jobIds = jobs.map(job => job.id);
+      console.log('Fetching applications for jobs:', jobIds);
+      
       const { data, error } = await supabase
         .from('job_applications')
         .select(`
           *,
           profiles:applicant_id (*)
         `)
-        .in('job_id', jobs.map(job => job.id));
+        .in('job_id', jobIds);
 
       if (error) throw error;
+      console.log('Fetched applications:', data);
       setApplications(data || []);
     } catch (error) {
       console.error('Error fetching applications:', error);
@@ -130,16 +137,33 @@ export default function EmployerDashboard() {
   };
 
   const createJob = async () => {
-    if (!user || !profile?.company_name) return;
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to create jobs.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!newJob.title || !newJob.description) {
+      toast({
+        title: "Error",
+        description: "Title and description are required.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
+      console.log('Creating job with data:', newJob);
       const { error } = await supabase
         .from('jobs')
         .insert({
           employer_id: user.id,
           title: newJob.title,
           description: newJob.description,
-          company_name: profile.company_name,
+          company_name: profile?.company_name || profile?.full_name || 'Unknown Company',
           location: newJob.location || null,
           salary_min: newJob.salary_min ? parseInt(newJob.salary_min) : null,
           salary_max: newJob.salary_max ? parseInt(newJob.salary_max) : null,
@@ -160,7 +184,7 @@ export default function EmployerDashboard() {
         requirements: ''
       });
       setIsCreateDialogOpen(false);
-      fetchJobs();
+      await fetchJobs();
       
       toast({
         title: "Job created!",
@@ -179,7 +203,17 @@ export default function EmployerDashboard() {
   const updateJob = async () => {
     if (!selectedJob) return;
 
+    if (!newJob.title || !newJob.description) {
+      toast({
+        title: "Error",
+        description: "Title and description are required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
+      console.log('Updating job:', selectedJob.id, 'with data:', newJob);
       const { error } = await supabase
         .from('jobs')
         .update({
@@ -197,7 +231,7 @@ export default function EmployerDashboard() {
 
       setIsEditDialogOpen(false);
       setSelectedJob(null);
-      fetchJobs();
+      await fetchJobs();
       
       toast({
         title: "Job updated!",
@@ -214,7 +248,12 @@ export default function EmployerDashboard() {
   };
 
   const deleteJob = async (jobId: string) => {
+    if (!confirm('Are you sure you want to delete this job? This action cannot be undone.')) {
+      return;
+    }
+
     try {
+      console.log('Deleting job:', jobId);
       const { error } = await supabase
         .from('jobs')
         .delete()
@@ -222,7 +261,7 @@ export default function EmployerDashboard() {
 
       if (error) throw error;
 
-      fetchJobs();
+      await fetchJobs();
       toast({
         title: "Job deleted",
         description: "The job posting has been removed.",
@@ -239,6 +278,7 @@ export default function EmployerDashboard() {
 
   const updateApplicationStatus = async (applicationId: string, status: ApplicationStatus) => {
     try {
+      console.log('Updating application status:', applicationId, 'to:', status);
       const { error } = await supabase
         .from('job_applications')
         .update({ 
@@ -249,7 +289,7 @@ export default function EmployerDashboard() {
 
       if (error) throw error;
 
-      fetchApplications();
+      await fetchApplications();
       toast({
         title: "Application status updated",
         description: `Application has been marked as ${status}.`,
@@ -276,23 +316,6 @@ export default function EmployerDashboard() {
       requirements: job.requirements || ''
     });
     setIsEditDialogOpen(true);
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      toast({
-        title: "Signed out",
-        description: "You have been successfully signed out.",
-      });
-    } catch (error) {
-      console.error('Error signing out:', error);
-      toast({
-        title: "Error",
-        description: "Failed to sign out.",
-        variant: "destructive",
-      });
-    }
   };
 
   const getStatusColor = (status: string) => {
@@ -332,108 +355,104 @@ export default function EmployerDashboard() {
               <h1 className="text-3xl font-bold text-gray-900">Employer Dashboard</h1>
               <p className="mt-2 text-gray-600">Manage your job postings and applications</p>
             </div>
-            <div className="flex items-center space-x-4">
-              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Post New Job
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Post New Job
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px] bg-white">
+                <DialogHeader>
+                  <DialogTitle>Post a New Job</DialogTitle>
+                  <DialogDescription>
+                    Fill in the details for your job posting.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="title" className="text-right">Title *</Label>
+                    <Input
+                      id="title"
+                      value={newJob.title}
+                      onChange={(e) => setNewJob({...newJob, title: e.target.value})}
+                      className="col-span-3"
+                      placeholder="Software Engineer"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="location" className="text-right">Location</Label>
+                    <Input
+                      id="location"
+                      value={newJob.location}
+                      onChange={(e) => setNewJob({...newJob, location: e.target.value})}
+                      className="col-span-3"
+                      placeholder="San Francisco, CA"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="job_type" className="text-right">Type</Label>
+                    <Select value={newJob.job_type} onValueChange={(value) => setNewJob({...newJob, job_type: value})}>
+                      <SelectTrigger className="col-span-3">
+                        <SelectValue placeholder="Select job type" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white">
+                        <SelectItem value="full-time">Full-time</SelectItem>
+                        <SelectItem value="part-time">Part-time</SelectItem>
+                        <SelectItem value="contract">Contract</SelectItem>
+                        <SelectItem value="remote">Remote</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label className="text-right">Salary Range</Label>
+                    <div className="col-span-3 flex gap-2">
+                      <Input
+                        value={newJob.salary_min}
+                        onChange={(e) => setNewJob({...newJob, salary_min: e.target.value})}
+                        placeholder="Min"
+                        type="number"
+                      />
+                      <Input
+                        value={newJob.salary_max}
+                        onChange={(e) => setNewJob({...newJob, salary_max: e.target.value})}
+                        placeholder="Max"
+                        type="number"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-4 items-start gap-4">
+                    <Label htmlFor="description" className="text-right">Description *</Label>
+                    <Textarea
+                      id="description"
+                      value={newJob.description}
+                      onChange={(e) => setNewJob({...newJob, description: e.target.value})}
+                      className="col-span-3"
+                      rows={4}
+                      placeholder="Job description..."
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-start gap-4">
+                    <Label htmlFor="requirements" className="text-right">Requirements</Label>
+                    <Textarea
+                      id="requirements"
+                      value={newJob.requirements}
+                      onChange={(e) => setNewJob({...newJob, requirements: e.target.value})}
+                      className="col-span-3"
+                      rows={3}
+                      placeholder="Job requirements..."
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button onClick={createJob} disabled={!newJob.title || !newJob.description}>
+                    Post Job
                   </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[600px] bg-white">
-                  <DialogHeader>
-                    <DialogTitle>Post a New Job</DialogTitle>
-                    <DialogDescription>
-                      Fill in the details for your job posting.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="title" className="text-right">Title</Label>
-                      <Input
-                        id="title"
-                        value={newJob.title}
-                        onChange={(e) => setNewJob({...newJob, title: e.target.value})}
-                        className="col-span-3"
-                        placeholder="Software Engineer"
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="location" className="text-right">Location</Label>
-                      <Input
-                        id="location"
-                        value={newJob.location}
-                        onChange={(e) => setNewJob({...newJob, location: e.target.value})}
-                        className="col-span-3"
-                        placeholder="San Francisco, CA"
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="job_type" className="text-right">Type</Label>
-                      <Select value={newJob.job_type} onValueChange={(value) => setNewJob({...newJob, job_type: value})}>
-                        <SelectTrigger className="col-span-3">
-                          <SelectValue placeholder="Select job type" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white">
-                          <SelectItem value="full-time">Full-time</SelectItem>
-                          <SelectItem value="part-time">Part-time</SelectItem>
-                          <SelectItem value="contract">Contract</SelectItem>
-                          <SelectItem value="remote">Remote</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label className="text-right">Salary Range</Label>
-                      <div className="col-span-3 flex gap-2">
-                        <Input
-                          value={newJob.salary_min}
-                          onChange={(e) => setNewJob({...newJob, salary_min: e.target.value})}
-                          placeholder="Min"
-                          type="number"
-                        />
-                        <Input
-                          value={newJob.salary_max}
-                          onChange={(e) => setNewJob({...newJob, salary_max: e.target.value})}
-                          placeholder="Max"
-                          type="number"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-4 items-start gap-4">
-                      <Label htmlFor="description" className="text-right">Description</Label>
-                      <Textarea
-                        id="description"
-                        value={newJob.description}
-                        onChange={(e) => setNewJob({...newJob, description: e.target.value})}
-                        className="col-span-3"
-                        rows={4}
-                        placeholder="Job description..."
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 items-start gap-4">
-                      <Label htmlFor="requirements" className="text-right">Requirements</Label>
-                      <Textarea
-                        id="requirements"
-                        value={newJob.requirements}
-                        onChange={(e) => setNewJob({...newJob, requirements: e.target.value})}
-                        className="col-span-3"
-                        rows={3}
-                        placeholder="Job requirements..."
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <Button onClick={createJob} disabled={!newJob.title || !newJob.description}>
-                      Post Job
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-              <Button variant="outline" onClick={handleSignOut}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Sign Out
-              </Button>
-            </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -469,7 +488,7 @@ export default function EmployerDashboard() {
         )}
 
         <div className="grid gap-8 lg:grid-cols-2">
-          {/* Jobs Section with Edit/Delete */}
+          {/* Jobs Section */}
           <div>
             <h2 className="text-xl font-semibold mb-4 flex items-center">
               <Briefcase className="w-5 h-5 mr-2" />
@@ -540,7 +559,7 @@ export default function EmployerDashboard() {
                     <div className="flex items-start justify-between">
                       <div>
                         <CardTitle className="text-base">
-                          {application.profiles?.full_name}
+                          {application.profiles?.full_name || 'Unknown Applicant'}
                         </CardTitle>
                         <CardDescription>
                           Applied for: {jobs.find(j => j.id === application.job_id)?.title}
@@ -605,19 +624,20 @@ export default function EmployerDashboard() {
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="title" className="text-right">Title</Label>
+                <Label htmlFor="edit-title" className="text-right">Title *</Label>
                 <Input
-                  id="title"
+                  id="edit-title"
                   value={newJob.title}
                   onChange={(e) => setNewJob({...newJob, title: e.target.value})}
                   className="col-span-3"
                   placeholder="Software Engineer"
+                  required
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="location" className="text-right">Location</Label>
+                <Label htmlFor="edit-location" className="text-right">Location</Label>
                 <Input
-                  id="location"
+                  id="edit-location"
                   value={newJob.location}
                   onChange={(e) => setNewJob({...newJob, location: e.target.value})}
                   className="col-span-3"
@@ -625,7 +645,7 @@ export default function EmployerDashboard() {
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="job_type" className="text-right">Type</Label>
+                <Label htmlFor="edit-job_type" className="text-right">Type</Label>
                 <Select value={newJob.job_type} onValueChange={(value) => setNewJob({...newJob, job_type: value})}>
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Select job type" />
@@ -656,20 +676,21 @@ export default function EmployerDashboard() {
                 </div>
               </div>
               <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="description" className="text-right">Description</Label>
+                <Label htmlFor="edit-description" className="text-right">Description *</Label>
                 <Textarea
-                  id="description"
+                  id="edit-description"
                   value={newJob.description}
                   onChange={(e) => setNewJob({...newJob, description: e.target.value})}
                   className="col-span-3"
                   rows={4}
                   placeholder="Job description..."
+                  required
                 />
               </div>
               <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="requirements" className="text-right">Requirements</Label>
+                <Label htmlFor="edit-requirements" className="text-right">Requirements</Label>
                 <Textarea
-                  id="requirements"
+                  id="edit-requirements"
                   value={newJob.requirements}
                   onChange={(e) => setNewJob({...newJob, requirements: e.target.value})}
                   className="col-span-3"
