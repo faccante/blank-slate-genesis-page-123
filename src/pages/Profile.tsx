@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { User, Building, Mail, Phone, MapPin, FileText, LogOut } from 'lucide-react';
 import { CVManager } from '@/components/CVManager';
+import JobSeekerRating from '@/components/JobSeekerRating';
 
 export default function Profile() {
   const { user, profile, updateProfile, signOut } = useAuth();
@@ -114,6 +115,13 @@ export default function Profile() {
                 </div>
                 <CardTitle>{profile.full_name || 'User'}</CardTitle>
                 <CardDescription className="capitalize">{profile.role.replace('_', ' ')}</CardDescription>
+                
+                {/* Show rating for job seekers */}
+                {profile.role === 'job_seeker' && (
+                  <div className="mt-3">
+                    <JobSeekerRating jobSeekerId={profile.id} />
+                  </div>
+                )}
               </CardHeader>
               <CardContent>
                 <div className="space-y-3 text-sm">
