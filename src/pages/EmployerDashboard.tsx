@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,25 +11,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Tables } from '@/integrations/supabase/types';
-import { Plus, Edit, Trash2, Users, Briefcase, BarChart3 } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Briefcase, BarChart3, Star } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import RatingDialog from '@/components/RatingDialog';
 
 type Job = Tables<'jobs'>;
 type JobApplication = Tables<'job_applications'> & {
   profiles: Tables<'profiles'>;
 };
+type Rating = Tables<'ratings'>;
 type ApplicationStatus = Tables<'job_applications'>['status'];
 
 export default function EmployerDashboard() {
   const { user, profile } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<JobApplication[]>([]);
+  const [ratings, setRatings] = useState<Rating[]>([]);
   const [analyticsData, setAnalyticsData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isRatingDialogOpen, setIsRatingDialogOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [selectedApplication, setSelectedApplication] = useState<JobApplication | null>(null);
   const [newJob, setNewJob] = useState({
     title: '',
     description: '',
@@ -52,6 +56,7 @@ export default function EmployerDashboard() {
     if (jobs.length > 0) {
       fetchApplications();
       fetchAnalyticsData();
+      fetchRatings();
     }
   }, [jobs]);
 
@@ -101,6 +106,24 @@ export default function EmployerDashboard() {
       setApplications(data || []);
     } catch (error) {
       console.error('Error fetching applications:', error);
+    }
+  };
+
+  const fetchRatings = async () => {
+    if (!user) return;
+
+    try {
+      console.log('Fetching ratings for employer:', user.id);
+      const { data, error } = await supabase
+        .from('ratings')
+        .select('*')
+        .eq('employer_id', user.id);
+
+      if (error) throw error;
+      console.log('Fetched ratings:', data);
+      setRatings(data || []);
+    } catch (error) {
+      console.error('Error fetching ratings:', error);
     }
   };
 
@@ -318,6 +341,11 @@ export default function EmployerDashboard() {
     setIsEditDialogOpen(true);
   };
 
+  const openRatingDialog = (application: JobApplication) => {
+    setSelectedApplication(application);
+    setIsRatingDialogOpen(true);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
@@ -326,6 +354,10 @@ export default function EmployerDashboard() {
       case 'rejected': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const isApplicationRated = (applicationId: string) => {
+    return ratings.some(rating => rating.application_id === applicationId);
   };
 
   const chartConfig = {
@@ -574,6 +606,7 @@ export default function EmployerDashboard() {
                     <div className="text-sm text-gray-600 mb-3">
                       Applied {new Date(application.applied_at).toLocaleDateString()}
                     </div>
+                    
                     {application.status === 'pending' && (
                       <div className="flex gap-2">
                         <Button
@@ -597,6 +630,25 @@ export default function EmployerDashboard() {
                         >
                           Mark Reviewed
                         </Button>
+                      </div>
+                    )}
+                    
+                    {application.status === 'accepted' && !isApplicationRated(application.id) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openRatingDialog(application)}
+                        className="flex items-center"
+                      >
+                        <Star className="w-4 h-4 mr-1" />
+                        Rate Job Seeker
+                      </Button>
+                    )}
+                    
+                    {application.status === 'accepted' && isApplicationRated(application.id) && (
+                      <div className="flex items-center text-sm text-green-600">
+                        <Star className="w-4 h-4 mr-1 fill-current" />
+                        Rated
                       </div>
                     )}
                   </CardContent>
@@ -709,6 +761,23 @@ export default function EmployerDashboard() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Rating Dialog */}
+        {selectedApplication && user && (
+          <RatingDialog
+            isOpen={isRatingDialogOpen}
+            onClose={() => {
+              setIsRatingDialogOpen(false);
+              setSelectedApplication(null);
+            }}
+            application={selectedApplication}
+            employerId={user.id}
+            onRatingSubmitted={() => {
+              fetchRatings();
+              fetchApplications();
+            }}
+          />
+        )}
       </div>
     </div>
   );

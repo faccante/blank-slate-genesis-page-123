@@ -206,6 +206,61 @@ export type Database = {
         }
         Relationships: []
       }
+      ratings: {
+        Row: {
+          application_id: string
+          created_at: string
+          employer_id: string
+          id: string
+          job_seeker_id: string
+          rating: number
+          review: string | null
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          employer_id: string
+          id?: string
+          job_seeker_id: string
+          rating: number
+          review?: string | null
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          employer_id?: string
+          id?: string
+          job_seeker_id?: string
+          rating?: number
+          review?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ratings_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: true
+            referencedRelation: "job_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ratings_employer_id_fkey"
+            columns: ["employer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ratings_job_seeker_id_fkey"
+            columns: ["job_seeker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
