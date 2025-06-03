@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -8,11 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { User, Building, Mail, Phone, MapPin, FileText } from 'lucide-react';
+import { User, Building, Mail, Phone, MapPin, FileText, LogOut } from 'lucide-react';
 import { CVManager } from '@/components/CVManager';
 
 export default function Profile() {
-  const { user, profile, updateProfile } = useAuth();
+  const { user, profile, updateProfile, signOut } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     full_name: '',
@@ -69,6 +68,23 @@ export default function Profile() {
     setIsEditing(false);
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Signed out",
+        description: "You have been successfully signed out.",
+      });
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast({
+        title: "Sign out failed",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (!user || !profile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -123,6 +139,18 @@ export default function Profile() {
                       <span className="text-gray-600">{profile.company_name}</span>
                     </div>
                   )}
+                </div>
+                
+                {/* Logout Button */}
+                <div className="mt-6 pt-4 border-t border-gray-200">
+                  <Button 
+                    variant="outline" 
+                    onClick={handleSignOut}
+                    className="w-full flex items-center justify-center gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </Button>
                 </div>
               </CardContent>
             </Card>
