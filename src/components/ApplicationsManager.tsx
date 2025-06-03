@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,7 +33,7 @@ export function ApplicationsManager() {
     minRating: '',
     skill: ''
   });
-  const [jobs, setJobs] = useState<Tables<'jobs'>[]>([]);
+  const [jobs, setJobs] = useState<{ id: string; title: string; }[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
