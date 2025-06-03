@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, X, Briefcase } from 'lucide-react';
 import { Tables } from '@/integrations/supabase/types';
@@ -36,6 +36,15 @@ export function JobPostingForm({ job, onSuccess, onCancel }: JobPostingFormProps
   const [newSkill, setNewSkill] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+
+  const jobTypeOptions = [
+    { value: 'full-time', label: 'Full-time' },
+    { value: 'part-time', label: 'Part-time' },
+    { value: 'contract', label: 'Contract' },
+    { value: 'freelance', label: 'Freelance' },
+    { value: 'internship', label: 'Internship' },
+    { value: 'remote', label: 'Remote' }
+  ];
 
   const addSkill = () => {
     if (!newSkill.trim()) return;
@@ -219,12 +228,18 @@ export function JobPostingForm({ job, onSuccess, onCancel }: JobPostingFormProps
 
           <div>
             <Label htmlFor="job_type">Job Type</Label>
-            <Input
-              id="job_type"
-              value={formData.job_type}
-              onChange={(e) => setFormData({...formData, job_type: e.target.value})}
-              placeholder="e.g. Full-time, Part-time, Contract"
-            />
+            <Select value={formData.job_type} onValueChange={(value) => setFormData({...formData, job_type: value})}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select job type" />
+              </SelectTrigger>
+              <SelectContent>
+                {jobTypeOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
