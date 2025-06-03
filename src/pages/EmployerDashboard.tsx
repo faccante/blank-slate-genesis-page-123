@@ -11,10 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Tables } from '@/integrations/supabase/types';
-import { Plus, Edit, Trash2, Users, Briefcase, BarChart3, Star } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Briefcase, BarChart3, Star, UserCheck } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import RatingDialog from '@/components/RatingDialog';
+import JobSeekerRating from '@/components/JobSeekerRating';
 
 type Job = Tables<'jobs'>;
 type JobApplication = Tables<'job_applications'> & {
@@ -327,6 +328,65 @@ export default function EmployerDashboard() {
     }
   };
 
+  const closeJobAndChooseCandidate = async (applicationId: string, jobId: string) => {
+    if (!confirm('Are you sure you want to choose this candidate and close the job? This will prevent new applications and reject all other pending applications.')) {
+      return;
+    }
+
+    try {
+      console.log('Choosing candidate and closing job:', { applicationId, jobId });
+      
+      // Start a transaction-like operation
+      // 1. Close the job
+      const { error: jobError } = await supabase
+        .from('jobs')
+        .update({ status: 'closed' })
+        .eq('id', jobId);
+
+      if (jobError) throw jobError;
+
+      // 2. Accept the chosen application
+      const { error: acceptError } = await supabase
+        .from('job_applications')
+        .update({ 
+          status: 'accepted',
+          reviewed_at: new Date().toISOString()
+        })
+        .eq('id', applicationId);
+
+      if (acceptError) throw acceptError;
+
+      // 3. Reject all other pending applications for this job
+      const { error: rejectError } = await supabase
+        .from('job_applications')
+        .update({ 
+          status: 'rejected',
+          reviewed_at: new Date().toISOString()
+        })
+        .eq('job_id', jobId)
+        .neq('id', applicationId)
+        .eq('status', 'pending');
+
+      if (rejectError) throw rejectError;
+
+      // Refresh data
+      await fetchJobs();
+      await fetchApplications();
+      
+      toast({
+        title: "Candidate chosen successfully!",
+        description: "The job has been closed and other applications have been rejected.",
+      });
+    } catch (error) {
+      console.error('Error choosing candidate:', error);
+      toast({
+        title: "Failed to choose candidate",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const openEditDialog = (job: Job) => {
     setSelectedJob(job);
     setNewJob({
@@ -541,13 +601,15 @@ export default function EmployerDashboard() {
                         >
                           {job.status}
                         </Badge>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEditDialog(job)}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
+                        {job.status === 'active' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditDialog(job)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="destructive"
                           size="sm"
@@ -585,75 +647,92 @@ export default function EmployerDashboard() {
               Recent Applications ({applications.length})
             </h2>
             <div className="space-y-4">
-              {applications.map((application) => (
-                <Card key={application.id}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-base">
-                          {application.profiles?.full_name || 'Unknown Applicant'}
-                        </CardTitle>
-                        <CardDescription>
-                          Applied for: {jobs.find(j => j.id === application.job_id)?.title}
-                        </CardDescription>
+              {applications.map((application) => {
+                const job = jobs.find(j => j.id === application.job_id);
+                return (
+                  <Card key={application.id}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-base">
+                            {application.profiles?.full_name || 'Unknown Applicant'}
+                          </CardTitle>
+                          <CardDescription>
+                            Applied for: {job?.title}
+                          </CardDescription>
+                          {application.profiles && (
+                            <JobSeekerRating 
+                              jobSeekerId={application.profiles.id} 
+                              className="mt-2"
+                            />
+                          )}
+                        </div>
+                        <Badge className={getStatusColor(application.status)}>
+                          {application.status}
+                        </Badge>
                       </div>
-                      <Badge className={getStatusColor(application.status)}>
-                        {application.status}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-sm text-gray-600 mb-3">
-                      Applied {new Date(application.applied_at).toLocaleDateString()}
-                    </div>
-                    
-                    {application.status === 'pending' && (
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => updateApplicationStatus(application.id, 'accepted' as ApplicationStatus)}
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          Accept
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => updateApplicationStatus(application.id, 'rejected' as ApplicationStatus)}
-                        >
-                          Reject
-                        </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-sm text-gray-600 mb-3">
+                        Applied {new Date(application.applied_at).toLocaleDateString()}
+                      </div>
+                      
+                      {application.status === 'pending' && job?.status === 'active' && (
+                        <div className="flex gap-2 flex-wrap">
+                          <Button
+                            size="sm"
+                            onClick={() => closeJobAndChooseCandidate(application.id, application.job_id)}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <UserCheck className="w-4 h-4 mr-1" />
+                            Choose & Close Job
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => updateApplicationStatus(application.id, 'accepted' as ApplicationStatus)}
+                            className="bg-blue-600 hover:bg-blue-700"
+                          >
+                            Accept
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => updateApplicationStatus(application.id, 'rejected' as ApplicationStatus)}
+                          >
+                            Reject
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => updateApplicationStatus(application.id, 'reviewed' as ApplicationStatus)}
+                          >
+                            Mark Reviewed
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {application.status === 'accepted' && !isApplicationRated(application.id) && (
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => updateApplicationStatus(application.id, 'reviewed' as ApplicationStatus)}
+                          onClick={() => openRatingDialog(application)}
+                          className="flex items-center"
                         >
-                          Mark Reviewed
+                          <Star className="w-4 h-4 mr-1" />
+                          Rate Job Seeker
                         </Button>
-                      </div>
-                    )}
-                    
-                    {application.status === 'accepted' && !isApplicationRated(application.id) && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openRatingDialog(application)}
-                        className="flex items-center"
-                      >
-                        <Star className="w-4 h-4 mr-1" />
-                        Rate Job Seeker
-                      </Button>
-                    )}
-                    
-                    {application.status === 'accepted' && isApplicationRated(application.id) && (
-                      <div className="flex items-center text-sm text-green-600">
-                        <Star className="w-4 h-4 mr-1 fill-current" />
-                        Rated
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+                      )}
+                      
+                      {application.status === 'accepted' && isApplicationRated(application.id) && (
+                        <div className="flex items-center text-sm text-green-600">
+                          <Star className="w-4 h-4 mr-1 fill-current" />
+                          Rated
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
               {applications.length === 0 && (
                 <div className="text-center py-8">
                   <Users className="w-12 h-12 mx-auto text-gray-400 mb-4" />
