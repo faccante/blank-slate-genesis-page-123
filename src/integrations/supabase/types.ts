@@ -60,6 +60,7 @@ export type Database = {
           job_id: string
           resume_url: string | null
           reviewed_at: string | null
+          skill: string | null
           status: Database["public"]["Enums"]["application_status"]
         }
         Insert: {
@@ -71,6 +72,7 @@ export type Database = {
           job_id: string
           resume_url?: string | null
           reviewed_at?: string | null
+          skill?: string | null
           status?: Database["public"]["Enums"]["application_status"]
         }
         Update: {
@@ -82,6 +84,7 @@ export type Database = {
           job_id?: string
           resume_url?: string | null
           reviewed_at?: string | null
+          skill?: string | null
           status?: Database["public"]["Enums"]["application_status"]
         }
         Relationships: [
