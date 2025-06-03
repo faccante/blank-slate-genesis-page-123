@@ -120,6 +120,7 @@ export type Database = {
           id: string
           job_type: string | null
           location: string | null
+          required_skills: string[] | null
           requirements: string | null
           salary_max: number | null
           salary_min: number | null
@@ -135,6 +136,7 @@ export type Database = {
           id?: string
           job_type?: string | null
           location?: string | null
+          required_skills?: string[] | null
           requirements?: string | null
           salary_max?: number | null
           salary_min?: number | null
@@ -150,6 +152,7 @@ export type Database = {
           id?: string
           job_type?: string | null
           location?: string | null
+          required_skills?: string[] | null
           requirements?: string | null
           salary_max?: number | null
           salary_min?: number | null
@@ -179,6 +182,7 @@ export type Database = {
           location: string | null
           phone: string | null
           role: Database["public"]["Enums"]["user_role"]
+          skills: string[] | null
           updated_at: string
         }
         Insert: {
@@ -192,6 +196,7 @@ export type Database = {
           location?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          skills?: string[] | null
           updated_at?: string
         }
         Update: {
@@ -205,6 +210,7 @@ export type Database = {
           location?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          skills?: string[] | null
           updated_at?: string
         }
         Relationships: []

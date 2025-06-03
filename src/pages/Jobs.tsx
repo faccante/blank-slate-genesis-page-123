@@ -1,23 +1,19 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Tables } from '@/integrations/supabase/types';
-import { MapPin, DollarSign, Clock, Building } from 'lucide-react';
+import { MapPin, DollarSign, Clock, Building, Award, AlertCircle } from 'lucide-react';
 import { JobFiltersComponent, JobFilters } from '@/components/JobFilters';
 
 type Job = Tables<'jobs'>;
-type CV = Tables<'cvs'>;
 
 export default function Jobs() {
   const { user, profile } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [cvs, setCvs] = useState<CV[]>([]);
   const [filters, setFilters] = useState<JobFilters>({
     search: '',
     location: '',
@@ -27,14 +23,12 @@ export default function Jobs() {
   });
   const [loading, setLoading] = useState(true);
   const [applications, setApplications] = useState<Set<string>>(new Set());
-  const [selectedCvs, setSelectedCvs] = useState<{ [jobId: string]: string }>({});
   const { toast } = useToast();
 
   useEffect(() => {
     fetchJobs();
     if (profile?.role === 'job_seeker') {
       fetchUserApplications();
-      fetchUserCVs();
     }
   }, [profile]);
 
@@ -76,31 +70,48 @@ export default function Jobs() {
     }
   };
 
-  const fetchUserCVs = async () => {
-    if (!user) return;
+  const getMatchingSkills = (userSkills: string[] = [], requiredSkills: string[] = []) => {
+    return userSkills.filter(skill => 
+      requiredSkills.some(required => 
+        required.toLowerCase() === skill.toLowerCase()
+      )
+    );
+  };
 
-    try {
-      const { data, error } = await supabase
-        .from('cvs')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+  const getMissingSkills = (userSkills: string[] = [], requiredSkills: string[] = []) => {
+    return requiredSkills.filter(required => 
+      !userSkills.some(skill => 
+        skill.toLowerCase() === required.toLowerCase()
+      )
+    );
+  };
 
-      if (error) throw error;
-      setCvs(data || []);
-    } catch (error) {
-      console.error('Error fetching CVs:', error);
-    }
+  const canApplyToJob = (job: Job) => {
+    if (!profile?.skills || !job.required_skills) return true;
+    
+    const missingSkills = getMissingSkills(profile.skills, job.required_skills);
+    return missingSkills.length === 0;
   };
 
   const applyToJob = async (jobId: string) => {
     if (!user || !profile) return;
 
-    const selectedCvId = selectedCvs[jobId];
-    if (!selectedCvId) {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+
+    if (!canApplyToJob(job)) {
       toast({
-        title: "Please select a CV",
-        description: "You need to select a CV to apply for this job.",
+        title: "Skills required",
+        description: "You need all required skills to apply for this job.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!profile.skills || profile.skills.length === 0) {
+      toast({
+        title: "Add your skills",
+        description: "Please add your skills to your profile before applying.",
         variant: "destructive",
       });
       return;
@@ -112,8 +123,8 @@ export default function Jobs() {
         .insert({
           job_id: jobId,
           applicant_id: user.id,
-          cv_id: selectedCvId,
-          status: 'pending'
+          status: 'pending',
+          skill: profile.skills.join(', ') // Store skills as comma-separated string
         });
 
       if (error) throw error;
@@ -219,96 +230,121 @@ export default function Jobs() {
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
-              {filteredJobs.map((job) => (
-                <Card key={job.id} className="hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg">{job.title}</CardTitle>
-                        <CardDescription className="flex items-center mt-1">
-                          <Building className="w-4 h-4 mr-1" />
-                          {job.company_name}
-                        </CardDescription>
-                      </div>
-                      {job.job_type && (
-                        <Badge variant="secondary" className="ml-2">
-                          {job.job_type}
-                        </Badge>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {job.location && (
-                        <div className="flex items-center text-sm text-gray-600">
-                          <MapPin className="w-4 h-4 mr-2" />
-                          {job.location}
+              {filteredJobs.map((job) => {
+                const userSkills = profile?.skills || [];
+                const matchingSkills = getMatchingSkills(userSkills, job.required_skills || []);
+                const missingSkills = getMissingSkills(userSkills, job.required_skills || []);
+                const canApply = canApplyToJob(job);
+
+                return (
+                  <Card key={job.id} className="hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg">{job.title}</CardTitle>
+                          <CardDescription className="flex items-center mt-1">
+                            <Building className="w-4 h-4 mr-1" />
+                            {job.company_name}
+                          </CardDescription>
                         </div>
-                      )}
-                      
-                      {formatSalary(job.salary_min || undefined, job.salary_max || undefined) && (
-                        <div className="flex items-center text-sm text-gray-600">
-                          <DollarSign className="w-4 h-4 mr-2" />
-                          {formatSalary(job.salary_min || undefined, job.salary_max || undefined)}
-                        </div>
-                      )}
-
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Clock className="w-4 h-4 mr-2" />
-                        Posted {new Date(job.created_at).toLocaleDateString()}
+                        {job.job_type && (
+                          <Badge variant="secondary" className="ml-2">
+                            {job.job_type}
+                          </Badge>
+                        )}
                       </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {job.location && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <MapPin className="w-4 h-4 mr-2" />
+                            {job.location}
+                          </div>
+                        )}
+                        
+                        {formatSalary(job.salary_min || undefined, job.salary_max || undefined) && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <DollarSign className="w-4 h-4 mr-2" />
+                            {formatSalary(job.salary_min || undefined, job.salary_max || undefined)}
+                          </div>
+                        )}
 
-                      <p className="text-sm text-gray-700 line-clamp-3">
-                        {job.description}
-                      </p>
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Clock className="w-4 h-4 mr-2" />
+                          Posted {new Date(job.created_at).toLocaleDateString()}
+                        </div>
 
-                      {profile?.role === 'job_seeker' && user && (
-                        <div className="space-y-3 pt-3 border-t">
-                          {!applications.has(job.id) && cvs.length > 0 && (
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Select CV for application:
-                              </label>
-                              <Select
-                                value={selectedCvs[job.id] || ''}
-                                onValueChange={(value) => setSelectedCvs(prev => ({
-                                  ...prev,
-                                  [job.id]: value
-                                }))}
-                              >
-                                <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Choose a CV..." />
-                                </SelectTrigger>
-                                <SelectContent className="bg-white">
-                                  {cvs.map((cv) => (
-                                    <SelectItem key={cv.id} value={cv.id}>
-                                      {cv.file_name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                        <p className="text-sm text-gray-700 line-clamp-3">
+                          {job.description}
+                        </p>
+
+                        {/* Required Skills */}
+                        {job.required_skills && job.required_skills.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Award className="w-4 h-4 text-gray-500" />
+                              <span className="text-sm font-medium text-gray-700">Required Skills</span>
                             </div>
-                          )}
+                            <div className="flex flex-wrap gap-1">
+                              {job.required_skills.map((skill, index) => (
+                                <Badge 
+                                  key={index} 
+                                  variant={matchingSkills.includes(skill) ? "default" : "outline"}
+                                  className={matchingSkills.includes(skill) ? "bg-green-100 text-green-800" : ""}
+                                >
+                                  {skill}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
-                          <Button
-                            onClick={() => applyToJob(job.id)}
-                            disabled={applications.has(job.id) || cvs.length === 0}
-                            className="w-full"
-                            variant={applications.has(job.id) ? "secondary" : "default"}
-                          >
-                            {applications.has(job.id) 
-                              ? 'Applied' 
-                              : cvs.length === 0 
-                                ? 'Upload CV to Apply' 
-                                : 'Apply Now'
-                            }
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                        {profile?.role === 'job_seeker' && user && (
+                          <div className="space-y-3 pt-3 border-t">
+                            {/* Skills Match Info */}
+                            {job.required_skills && job.required_skills.length > 0 && profile.skills && (
+                              <div className="space-y-2">
+                                {matchingSkills.length > 0 && (
+                                  <div className="text-sm">
+                                    <span className="text-green-600 font-medium">
+                                      ✓ You have {matchingSkills.length} required skill(s)
+                                    </span>
+                                  </div>
+                                )}
+                                {missingSkills.length > 0 && (
+                                  <div className="text-sm">
+                                    <span className="text-red-600 font-medium flex items-center gap-1">
+                                      <AlertCircle className="w-3 h-3" />
+                                      Missing {missingSkills.length} required skill(s): {missingSkills.join(', ')}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            <Button
+                              onClick={() => applyToJob(job.id)}
+                              disabled={applications.has(job.id) || !canApply || !profile.skills || profile.skills.length === 0}
+                              className="w-full"
+                              variant={applications.has(job.id) ? "secondary" : canApply ? "default" : "outline"}
+                            >
+                              {applications.has(job.id) 
+                                ? 'Applied' 
+                                : !profile.skills || profile.skills.length === 0
+                                  ? 'Add Skills to Apply'
+                                  : !canApply
+                                    ? 'Missing Required Skills'
+                                    : 'Apply Now'
+                              }
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
 
             {filteredJobs.length === 0 && (

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { User, Building, Mail, Phone, MapPin, FileText, LogOut } from 'lucide-react';
-import { CVManager } from '@/components/CVManager';
+import { SkillsManager } from '@/components/SkillsManager';
 import JobSeekerRating from '@/components/JobSeekerRating';
 
 export default function Profile() {
@@ -163,10 +164,10 @@ export default function Profile() {
               </CardContent>
             </Card>
 
-            {/* CV Management for Job Seekers */}
+            {/* Skills Management for Job Seekers */}
             {profile.role === 'job_seeker' && (
               <div className="mt-6">
-                <CVManager />
+                <SkillsManager />
               </div>
             )}
           </div>
