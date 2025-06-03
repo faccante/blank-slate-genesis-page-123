@@ -1,6 +1,11 @@
 
+import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { ApplicationsManager } from '@/components/ApplicationsManager';
+import { JobManagement } from '@/components/JobManagement';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Briefcase, FileText } from 'lucide-react';
 
 export default function EmployerDashboard() {
   const { user, profile } = useAuth();
@@ -35,7 +40,26 @@ export default function EmployerDashboard() {
           <p className="mt-2 text-gray-600">Manage your job postings and applications</p>
         </div>
 
-        <ApplicationsManager />
+        <Tabs defaultValue="applications" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="applications" className="flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Applications
+            </TabsTrigger>
+            <TabsTrigger value="jobs" className="flex items-center gap-2">
+              <Briefcase className="w-4 h-4" />
+              Job Postings
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="applications">
+            <ApplicationsManager />
+          </TabsContent>
+
+          <TabsContent value="jobs">
+            <JobManagement />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

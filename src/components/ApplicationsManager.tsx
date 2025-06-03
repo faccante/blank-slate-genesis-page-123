@@ -6,9 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Tables } from '@/integrations/supabase/types';
-import { User, Briefcase, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { User, Briefcase, Clock, CheckCircle, XCircle, Filter } from 'lucide-react';
+import JobSeekerRating from './JobSeekerRating';
 
 type Application = Tables<'job_applications'> & {
   applicant: {
@@ -24,14 +27,42 @@ type Application = Tables<'job_applications'> & {
 export function ApplicationsManager() {
   const { user } = useAuth();
   const [applications, setApplications] = useState<Application[]>([]);
+  const [filteredApplications, setFilteredApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({
+    job: '',
+    minRating: '',
+    skill: ''
+  });
+  const [jobs, setJobs] = useState<Tables<'jobs'>[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
     if (user) {
       fetchApplications();
+      fetchJobs();
     }
   }, [user]);
+
+  useEffect(() => {
+    applyFilters();
+  }, [applications, filters]);
+
+  const fetchJobs = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('id, title')
+        .eq('employer_id', user.id);
+
+      if (error) throw error;
+      setJobs(data || []);
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+    }
+  };
 
   const fetchApplications = async () => {
     if (!user) return;
@@ -60,6 +91,28 @@ export function ApplicationsManager() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const applyFilters = () => {
+    let filtered = [...applications];
+
+    // Filter by job
+    if (filters.job) {
+      filtered = filtered.filter(app => app.job_id === filters.job);
+    }
+
+    // Filter by skill
+    if (filters.skill) {
+      filtered = filtered.filter(app => 
+        app.applicant?.skills?.some(skill => 
+          skill.toLowerCase().includes(filters.skill.toLowerCase())
+        )
+      );
+    }
+
+    // Sort by rating would require fetching ratings for each applicant
+    // For now, we'll sort by application date
+    setFilteredApplications(filtered);
   };
 
   const updateApplicationStatus = async (applicationId: string, status: 'pending' | 'reviewed' | 'accepted' | 'rejected') => {
@@ -125,6 +178,14 @@ export function ApplicationsManager() {
     );
   };
 
+  const clearFilters = () => {
+    setFilters({
+      job: '',
+      minRating: '',
+      skill: ''
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -137,20 +198,68 @@ export function ApplicationsManager() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Job Applications</h2>
-        <Badge variant="outline">{applications.length} applications</Badge>
+        <Badge variant="outline">{filteredApplications.length} applications</Badge>
       </div>
 
-      {applications.length === 0 ? (
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center">
+            <Filter className="w-5 h-5 mr-2" />
+            Filter Applications
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="job-filter">Filter by Job</Label>
+              <Select value={filters.job} onValueChange={(value) => setFilters({...filters, job: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All jobs" />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  <SelectItem value="">All jobs</SelectItem>
+                  {jobs.map((job) => (
+                    <SelectItem key={job.id} value={job.id}>{job.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="skill-filter">Filter by Skill</Label>
+              <Input
+                id="skill-filter"
+                placeholder="e.g. JavaScript"
+                value={filters.skill}
+                onChange={(e) => setFilters({...filters, skill: e.target.value})}
+              />
+            </div>
+            <div className="flex items-end">
+              <Button variant="outline" onClick={clearFilters}>
+                Clear Filters
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {filteredApplications.length === 0 ? (
         <Card>
           <CardContent className="text-center py-12">
             <Briefcase className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No applications yet</h3>
-            <p className="text-gray-600">Applications for your job postings will appear here.</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {applications.length === 0 ? 'No applications yet' : 'No applications match your filters'}
+            </h3>
+            <p className="text-gray-600">
+              {applications.length === 0 
+                ? 'Applications for your job postings will appear here.' 
+                : 'Try adjusting your filters to see more applications.'}
+            </p>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-6">
-          {applications.map((application) => {
+          {filteredApplications.map((application) => {
             const matchingSkills = getMatchingSkills(application.applicant?.skills, application.job?.required_skills);
             const missingSkills = getMissingSkills(application.applicant?.skills, application.job?.required_skills);
             
@@ -169,6 +278,10 @@ export function ApplicationsManager() {
                         <CardDescription>
                           Applied for: {application.job?.title}
                         </CardDescription>
+                        <JobSeekerRating 
+                          jobSeekerId={application.applicant_id} 
+                          className="mt-1"
+                        />
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
